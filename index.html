@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Sensor Debug Tool</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, system-ui, sans-serif; background: #F5F6F8; color: #1A2030; padding: 16px; max-width: 420px; margin: 0 auto; }
+h1 { font-size: 18px; margin-bottom: 4px; }
+.sub { font-size: 12px; color: #6B7A90; margin-bottom: 20px; }
+.card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 12px; border: 1px solid #E8ECF0; }
+.card h2 { font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.ok { background: #22c55e; }
+.fail { background: #ef4444; }
+.wait { background: #f59e0b; }
+.test { background: #6B7A90; }
+.row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #F0F1F3; font-size: 12px; }
+.row:last-child { border: none; }
+.label { color: #6B7A90; }
+.value { font-weight: 600; font-family: monospace; }
+.btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.btn-primary { background: #4A6CF7; color: #fff; }
+.btn-stop { background: #ef4444; color: #fff; }
+.btn-secondary { background: #fff; color: #4A6CF7; border: 1.5px solid #E8ECF0; }
+.log { font-size: 10px; color: #6B7A90; font-family: monospace; max-height: 120px; overflow-y: auto; margin-top: 8px; background: #F8F9FB; padding: 8px; border-radius: 8px; line-height: 1.6; }
+.steps-display { font-size: 48px; font-weight: 800; text-align: center; color: #4A6CF7; font-family: monospace; padding: 10px 0; }
+.steps-label { text-align: center; font-size: 12px; color: #6B7A90; }
+.result-box { padding: 12px; border-radius: 10px; margin-top: 10px; font-size: 12px; line-height: 1.5; }
+.result-ok { background: #EAFAF1; color: #166534; border: 1px solid #22c55e33; }
+.result-fail { background: #FEF2F2; color: #991B1B; border: 1px solid #ef444433; }
+.result-warn { background: #FFFBEB; color: #92400E; border: 1px solid #f59e0b33; }
+</style>
+</head>
+<body>
+
+<h1>Sensor Debug Tool</h1>
+<p class="sub">Device capability test v1.0</p>
+
+<!-- 1. GPS -->
+<div class="card" id="gps-card">
+  <h2><span class="status test" id="gps-status"></span> GPS (Geolocation API)</h2>
+  <div id="gps-data">
+    <div class="row"><span class="label">Status</span><span class="value" id="gps-state">Ready</span></div>
+    <div class="row"><span class="label">Latitude</span><span class="value" id="gps-lat">—</span></div>
+    <div class="row"><span class="label">Longitude</span><span class="value" id="gps-lng">—</span></div>
+    <div class="row"><span class="label">Accuracy</span><span class="value" id="gps-acc">—</span></div>
+    <div class="row"><span class="label">Speed</span><span class="value" id="gps-speed">—</span></div>
+    <div class="row"><span class="label">Updates</span><span class="value" id="gps-count">0</span></div>
+  </div>
+  <button class="btn btn-primary" id="gps-btn" onclick="testGPS()">Test GPS</button>
+</div>
+
+<!-- 2. Accelerometer -->
+<div class="card" id="accel-card">
+  <h2><span class="status test" id="accel-status"></span> Accelerometer</h2>
+  <div id="accel-data">
+    <div class="row"><span class="label">Generic Sensor API</span><span class="value" id="accel-generic">—</span></div>
+    <div class="row"><span class="label">DeviceMotion (fallback)</span><span class="value" id="accel-motion">—</span></div>
+    <div class="row"><span class="label">X</span><span class="value" id="accel-x">—</span></div>
+    <div class="row"><span class="label">Y</span><span class="value" id="accel-y">—</span></div>
+    <div class="row"><span class="label">Z</span><span class="value" id="accel-z">—</span></div>
+    <div class="row"><span class="label">Updates/sec</span><span class="value" id="accel-rate">—</span></div>
+  </div>
+  <button class="btn btn-primary" id="accel-btn" onclick="testAccel()">Test Accelerometer</button>
+</div>
+
+<!-- 3. Step Detection -->
+<div class="card" id="step-card">
+  <h2><span class="status test" id="step-status"></span> Step Detection (from accelerometer)</h2>
+  <div class="steps-display" id="step-count">0</div>
+  <div class="steps-label">detected steps (walk around for 30 seconds)</div>
+  <div id="step-data">
+    <div class="row"><span class="label">Algorithm</span><span class="value">Peak detection on Y-axis</span></div>
+    <div class="row"><span class="label">Threshold</span><span class="value" id="step-threshold">auto</span></div>
+    <div class="row"><span class="label">Confidence</span><span class="value" id="step-confidence">—</span></div>
+  </div>
+  <button class="btn btn-primary" id="step-btn" onclick="testSteps()">Start Step Counter (30s)</button>
+</div>
+
+<!-- 4. Wake Lock -->
+<div class="card" id="wake-card">
+  <h2><span class="status test" id="wake-status"></span> Wake Lock (Screen Stay On)</h2>
+  <div id="wake-data">
+    <div class="row"><span class="label">API Available</span><span class="value" id="wake-api">—</span></div>
+    <div class="row"><span class="label">Lock Active</span><span class="value" id="wake-active">No</span></div>
+    <div class="row"><span class="label">Duration</span><span class="value" id="wake-duration">—</span></div>
+  </div>
+  <button class="btn btn-primary" id="wake-btn" onclick="testWakeLock()">Activate Wake Lock</button>
+</div>
+
+<!-- 5. Summary -->
+<div class="card" id="summary-card" style="display:none;">
+  <h2>Summary</h2>
+  <div id="summary-content"></div>
+</div>
+
+<!-- Log -->
+<div class="card">
+  <h2>Debug Log</h2>
+  <div class="log" id="log"></div>
+  <button class="btn btn-secondary" onclick="document.getElementById('log').innerHTML='';" style="margin-top:8px;">Clear Log</button>
+</div>
+
+<script>
+let gpsWatchId = null;
+let gpsCount = 0;
+let accelSensor = null;
+let accelCount = 0;
+let accelLastSec = 0;
+let accelMethod = null;
+let stepData = [];
+let stepCount = 0;
+let stepRunning = false;
+let wakeLock = null;
+let wakeStart = null;
+let results = { gps: null, accel: null, steps: null, wake: null };
+
+function log(msg) {
+  const el = document.getElementById('log');
+  const time = new Date().toLocaleTimeString();
+  el.innerHTML += `<div>${time} — ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setStatus(id, state) {
+  document.getElementById(id).className = 'status ' + state;
+}
+
+// ============ GPS ============
+function testGPS() {
+  log('Testing GPS...');
+  document.getElementById('gps-state').textContent = 'Requesting...';
+  setStatus('gps-status', 'wait');
+
+  if (!navigator.geolocation) {
+    log('GPS: Geolocation API NOT available');
+    document.getElementById('gps-state').textContent = 'NOT AVAILABLE';
+    setStatus('gps-status', 'fail');
+    results.gps = false;
+    showSummary();
+    return;
+  }
+
+  if (gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+    document.getElementById('gps-btn').textContent = 'Test GPS';
+    document.getElementById('gps-btn').className = 'btn btn-primary';
+    log('GPS: Stopped');
+    return;
+  }
+
+  gpsWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      gpsCount++;
+      document.getElementById('gps-lat').textContent = pos.coords.latitude.toFixed(6);
+      document.getElementById('gps-lng').textContent = pos.coords.longitude.toFixed(6);
+      document.getElementById('gps-acc').textContent = (pos.coords.accuracy || 0).toFixed(1) + ' m';
+      document.getElementById('gps-speed').textContent = pos.coords.speed !== null ? (pos.coords.speed * 3.6).toFixed(1) + ' km/h' : 'N/A';
+      document.getElementById('gps-count').textContent = gpsCount;
+      document.getElementById('gps-state').textContent = 'Active';
+      setStatus('gps-status', 'ok');
+      results.gps = true;
+      document.getElementById('gps-btn').textContent = 'Stop GPS';
+      document.getElementById('gps-btn').className = 'btn btn-stop';
+      if (gpsCount === 1) log('GPS: First fix — accuracy ' + pos.coords.accuracy.toFixed(1) + 'm');
+      showSummary();
+    },
+    (err) => {
+      log('GPS Error: ' + err.message);
+      document.getElementById('gps-state').textContent = 'ERROR: ' + err.message;
+      setStatus('gps-status', 'fail');
+      results.gps = false;
+      showSummary();
+    },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+  );
+}
+
+// ============ ACCELEROMETER ============
+function testAccel() {
+  log('Testing Accelerometer...');
+  setStatus('accel-status', 'wait');
+
+  // Stop if running
+  if (accelSensor || accelMethod === 'motion') {
+    stopAccel();
+    return;
+  }
+
+  // Try Generic Sensor API first
+  if (typeof Accelerometer !== 'undefined') {
+    try {
+      accelSensor = new Accelerometer({ frequency: 30 });
+      accelSensor.addEventListener('reading', () => {
+        accelCount++;
+        document.getElementById('accel-x').textContent = accelSensor.x.toFixed(3);
+        document.getElementById('accel-y').textContent = accelSensor.y.toFixed(3);
+        document.getElementById('accel-z').textContent = accelSensor.z.toFixed(3);
+
+        const now = Math.floor(Date.now() / 1000);
+        if (now !== accelLastSec) { 
+          document.getElementById('accel-rate').textContent = accelCount + '/s';
+          accelCount = 0; 
+          accelLastSec = now; 
+        }
+
+        if (stepRunning) {
+          stepData.push({ t: Date.now(), x: accelSensor.x, y: accelSensor.y, z: accelSensor.z });
+        }
+      });
+      accelSensor.addEventListener('error', (e) => {
+        log('Accel Sensor error: ' + e.error.message);
+        tryDeviceMotion();
+      });
+      accelSensor.start();
+      accelMethod = 'generic';
+      document.getElementById('accel-generic').textContent = 'YES';
+      document.getElementById('accel-motion').textContent = '—';
+      setStatus('accel-status', 'ok');
+      results.accel = 'generic';
+      log('Accelerometer: Generic Sensor API works!');
+      document.getElementById('accel-btn').textContent = 'Stop';
+      document.getElementById('accel-btn').className = 'btn btn-stop';
+      showSummary();
+      return;
+    } catch (e) {
+      log('Generic Sensor failed: ' + e.message);
+    }
+  }
+
+  document.getElementById('accel-generic').textContent = 'NO';
+  tryDeviceMotion();
+}
+
+function tryDeviceMotion() {
+  log('Trying DeviceMotion fallback...');
+
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    // iOS 13+ needs permission
+    DeviceMotionEvent.requestPermission().then(state => {
+      if (state === 'granted') startDeviceMotion();
+      else { 
+        log('DeviceMotion: Permission denied');
+        document.getElementById('accel-motion').textContent = 'DENIED';
+        setStatus('accel-status', 'fail');
+        results.accel = false;
+        showSummary();
+      }
+    }).catch(e => {
+      log('DeviceMotion permission error: ' + e);
+      startDeviceMotion(); // try anyway
+    });
+  } else {
+    startDeviceMotion();
+  }
+}
+
+function startDeviceMotion() {
+  window.addEventListener('devicemotion', onDeviceMotion);
+  accelMethod = 'motion';
+  document.getElementById('accel-motion').textContent = 'Testing...';
+  document.getElementById('accel-btn').textContent = 'Stop';
+  document.getElementById('accel-btn').className = 'btn btn-stop';
+
+  setTimeout(() => {
+    if (accelMethod === 'motion' && document.getElementById('accel-x').textContent === '—') {
+      log('DeviceMotion: No data received after 3s');
+      document.getElementById('accel-motion').textContent = 'NO DATA';
+      setStatus('accel-status', 'fail');
+      results.accel = false;
+      showSummary();
+    }
+  }, 3000);
+}
+
+function onDeviceMotion(e) {
+  const a = e.accelerationIncludingGravity || e.acceleration;
+  if (!a) return;
+
+  accelCount++;
+  const x = a.x || 0, y = a.y || 0, z = a.z || 0;
+  document.getElementById('accel-x').textContent = x.toFixed(3);
+  document.getElementById('accel-y').textContent = y.toFixed(3);
+  document.getElementById('accel-z').textContent = z.toFixed(3);
+
+  const now = Math.floor(Date.now() / 1000);
+  if (now !== accelLastSec) { 
+    document.getElementById('accel-rate').textContent = accelCount + '/s';
+    accelCount = 0; 
+    accelLastSec = now; 
+  }
+
+  if (stepRunning) {
+    stepData.push({ t: Date.now(), x, y, z });
+  }
+
+  if (document.getElementById('accel-motion').textContent === 'Testing...') {
+    document.getElementById('accel-motion').textContent = 'YES';
+    setStatus('accel-status', 'ok');
+    results.accel = 'motion';
+    log('Accelerometer: DeviceMotion fallback works!');
+    showSummary();
+  }
+}
+
+function stopAccel() {
+  if (accelSensor) { accelSensor.stop(); accelSensor = null; }
+  if (accelMethod === 'motion') { window.removeEventListener('devicemotion', onDeviceMotion); }
+  accelMethod = null;
+  document.getElementById('accel-btn').textContent = 'Test Accelerometer';
+  document.getElementById('accel-btn').className = 'btn btn-primary';
+  log('Accelerometer: Stopped');
+}
+
+// ============ STEP DETECTION ============
+function testSteps() {
+  if (stepRunning) return;
+  if (!accelMethod) {
+    log('Steps: Start accelerometer first!');
+    return;
+  }
+
+  stepRunning = true;
+  stepData = [];
+  stepCount = 0;
+  document.getElementById('step-count').textContent = '0';
+  document.getElementById('step-btn').textContent = 'Counting... (30s)';
+  document.getElementById('step-btn').className = 'btn btn-stop';
+  setStatus('step-status', 'wait');
+  log('Step counter: Started (walk around for 30 seconds)');
+
+  let lastPeak = 0;
+  const minInterval = 250; // min ms between steps
+  const threshold = 1.5; // acceleration threshold for step
+
+  const stepInterval = setInterval(() => {
+    // Simple peak detection on magnitude
+    const recent = stepData.slice(-3);
+    if (recent.length < 3) return;
+
+    const magnitudes = recent.map(d => Math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z));
+    const avg = magnitudes.reduce((a, b) => a + b) / magnitudes.length;
+    const current = magnitudes[magnitudes.length - 1];
+
+    if (current > avg + threshold && Date.now() - lastPeak > minInterval) {
+      stepCount++;
+      lastPeak = Date.now();
+      document.getElementById('step-count').textContent = stepCount;
+    }
+  }, 50);
+
+  setTimeout(() => {
+    clearInterval(stepInterval);
+    stepRunning = false;
+    document.getElementById('step-btn').textContent = 'Start Step Counter (30s)';
+    document.getElementById('step-btn').className = 'btn btn-primary';
+
+    if (stepCount > 5) {
+      setStatus('step-status', 'ok');
+      document.getElementById('step-confidence').textContent = stepCount > 30 ? 'HIGH' : stepCount > 15 ? 'MEDIUM' : 'LOW';
+      results.steps = stepCount;
+      log('Step counter: ' + stepCount + ' steps in 30s. Detection works!');
+    } else {
+      setStatus('step-status', stepCount > 0 ? 'wait' : 'fail');
+      document.getElementById('step-confidence').textContent = 'POOR — did you walk?';
+      results.steps = stepCount;
+      log('Step counter: Only ' + stepCount + ' steps. Either not walking or detection weak.');
+    }
+    showSummary();
+  }, 30000);
+}
+
+// ============ WAKE LOCK ============
+async function testWakeLock() {
+  log('Testing Wake Lock...');
+
+  if (wakeLock) {
+    await wakeLock.release();
+    wakeLock = null;
+    document.getElementById('wake-active').textContent = 'No';
+    document.getElementById('wake-btn').textContent = 'Activate Wake Lock';
+    document.getElementById('wake-btn').className = 'btn btn-primary';
+    const dur = ((Date.now() - wakeStart) / 1000).toFixed(0);
+    document.getElementById('wake-duration').textContent = dur + 's';
+    log('Wake Lock: Released after ' + dur + 's');
+    return;
+  }
+
+  if ('wakeLock' in navigator) {
+    document.getElementById('wake-api').textContent = 'YES';
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeStart = Date.now();
+      document.getElementById('wake-active').textContent = 'YES';
+      setStatus('wake-status', 'ok');
+      results.wake = true;
+      log('Wake Lock: Active! Screen will stay on.');
+      document.getElementById('wake-btn').textContent = 'Release Wake Lock';
+      document.getElementById('wake-btn').className = 'btn btn-stop';
+
+      wakeLock.addEventListener('release', () => {
+        document.getElementById('wake-active').textContent = 'Released';
+        log('Wake Lock: Was released (maybe by system)');
+      });
+
+      // Update duration
+      const durInterval = setInterval(() => {
+        if (!wakeLock) { clearInterval(durInterval); return; }
+        document.getElementById('wake-duration').textContent = ((Date.now() - wakeStart) / 1000).toFixed(0) + 's';
+      }, 1000);
+
+    } catch (e) {
+      log('Wake Lock error: ' + e.message);
+      document.getElementById('wake-active').textContent = 'ERROR';
+      setStatus('wake-status', 'fail');
+      results.wake = false;
+    }
+  } else {
+    document.getElementById('wake-api').textContent = 'NO';
+    setStatus('wake-status', 'fail');
+    results.wake = false;
+    log('Wake Lock: API not available in this browser');
+  }
+  showSummary();
+}
+
+// ============ SUMMARY ============
+function showSummary() {
+  const el = document.getElementById('summary-card');
+  const content = document.getElementById('summary-content');
+  
+  if (results.gps === null && results.accel === null && results.steps === null && results.wake === null) return;
+  el.style.display = 'block';
+
+  let html = '';
+
+  // GPS
+  if (results.gps === true) html += '<div class="result-box result-ok">GPS: Funguje. Presnost: ' + (document.getElementById('gps-acc').textContent) + '</div>';
+  else if (results.gps === false) html += '<div class="result-box result-fail">GPS: NEFUNGUJE. Pi Walk potrebuje GPS.</div>';
+
+  // Accelerometer
+  if (results.accel === 'generic') html += '<div class="result-box result-ok">Akcelerometer: Funguje (Generic Sensor API). Najlepsia metoda.</div>';
+  else if (results.accel === 'motion') html += '<div class="result-box result-warn">Akcelerometer: Funguje cez DeviceMotion (fallback). Funkcne ale menej presne.</div>';
+  else if (results.accel === false) html += '<div class="result-box result-fail">Akcelerometer: NEFUNGUJE. Anti-cheat bude obmedzeny iba na GPS.</div>';
+
+  // Steps
+  if (results.steps !== null) {
+    if (results.steps > 30) html += '<div class="result-box result-ok">Kroky: Detekcia funguje dobre (' + results.steps + ' krokov / 30s). Step counter je pouzitelny.</div>';
+    else if (results.steps > 10) html += '<div class="result-box result-warn">Kroky: Detekcia funguje ciastocne (' + results.steps + ' krokov / 30s). Moze byt nepresna.</div>';
+    else html += '<div class="result-box result-fail">Kroky: Slaba detekcia (' + results.steps + ' krokov / 30s). Treba lepsiu kalibraciu alebo inu metodu.</div>';
+  }
+
+  // Wake Lock
+  if (results.wake === true) html += '<div class="result-box result-ok">Wake Lock: Funguje. Displej zostane zapnuty pocas aktivity.</div>';
+  else if (results.wake === false) html += '<div class="result-box result-fail">Wake Lock: NEFUNGUJE. Pouzivatel bude musiet rucne nastavit aby sa displej nevypinal.</div>';
+
+  // Overall
+  const allGood = results.gps && results.accel && results.steps > 10 && results.wake;
+  const partial = results.gps && (results.accel || results.steps > 5);
+
+  if (allGood) {
+    html += '<div class="result-box result-ok" style="margin-top:12px;font-weight:600;">CELKOVY VERDIKT: Vsetky senzory funguju. Pi Walk web app je plne funkcna v tomto prehliadaci.</div>';
+  } else if (partial) {
+    html += '<div class="result-box result-warn" style="margin-top:12px;font-weight:600;">CELKOVY VERDIKT: Ciastocna funkcnost. GPS funguje, akcelerometer/kroky su obmedzene. Web app je pouzitelna s upravami.</div>';
+  } else {
+    html += '<div class="result-box result-fail" style="margin-top:12px;font-weight:600;">CELKOVY VERDIKT: Kriticke senzory nefunguju. Nativna app bude potrebna skor.</div>';
+  }
+
+  content.innerHTML = html;
+}
+
+// Log browser info on load
+window.addEventListener('load', () => {
+  log('Browser: ' + navigator.userAgent.substring(0, 80));
+  log('Generic Sensor API: ' + (typeof Accelerometer !== 'undefined' ? 'Available' : 'NOT available'));
+  log('DeviceMotion: ' + (typeof DeviceMotionEvent !== 'undefined' ? 'Available' : 'NOT available'));
+  log('Wake Lock API: ' + ('wakeLock' in navigator ? 'Available' : 'NOT available'));
+  log('Geolocation API: ' + ('geolocation' in navigator ? 'Available' : 'NOT available'));
+  log('Ready. Test each sensor individually.');
+});
+</script>
+</body>
+</html>
